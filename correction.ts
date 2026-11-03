@@ -1,37 +1,41 @@
+
+interface Publiant { publier(texte: string): void; }
+interface Messagerie { envoyerMessagePrive(dest: Messagerie, texte: string): void; }
+interface Annonceur { acheterPublicite(budget: number): void; }
+interface Employeur { gererEmployes(): Utilisateur[]; }
+
+type TypeCompte = "standard" | "premium" | "entreprise";
+
+abstract class Compte { constructor(public readonly pseudo: string) {} }
+
+class CompteStandard extends Compte implements Publiant, Messagerie {
+    publier(texte: string) { /* ... */ }
+    envoyerMessagePrive(dest: Messagerie, texte: string) { /* ... */ }
+}
+
+class ComptePremium extends Compte implements Publiant, Messagerie, Annonceur {
+    publier(texte: string) { /* ... */ }
+    envoyerMessagePrive(dest: Messagerie, texte: string) { /* ... */ }
+    acheterPublicite(budget: number) { /* ... */ }
+}
+class CompteEntreprise extends Compte implements Publiant, Annonceur, Employeur {
+    publier(texte: string) { /* ... */ }
+    acheterPublicite(budget: number) { /* ... */ }
+    gererEmployes(): Utilisateur[] { return []; }
+}
+const fabriques: Record<TypeCompte, (pseudo: string) => Compte> = {
+    standard: p => new CompteStandard(p),
+    premium: p => new ComptePremium(p),
+    entreprise: p => new CompteEntreprise(p),
+};
 class ServiceUtilisateur {
     private db = new MySqlConnexion("mysql://localhost/piaf");
 
-    creerCompte(pseudo: string, email: string, type: string): Compte {
-        let compte: Compte;
-        if (type === "standard") compte = new CompteStandard(pseudo);
-        else if (type === "premium") compte = new ComptePremium(pseudo);
-        else if (type === "entreprise") compte = new CompteEntreprise(pseudo);
-        else throw new Error("Type inconnu");
-
+    creerCompte(pseudo: string, email: string, type: TypeCompte) {
+        const compte = fabriques[type](pseudo);
         this.db.execute(`INSERT INTO comptes VALUES ('${pseudo}', '${email}', '${type}')`);
         const html = `<h1>Bienvenue ${pseudo}</h1><p>Merci de nous rejoindre.</p>`;
         new SmtpClient("smtp.piaf.fr").send(email, "Bienvenue", html);
         return compte;
     }
-}
-
-interface Compte {
-    publier(texte: string): void;
-    envoyerMessagePrive(dest: Compte, texte: string): void;
-    acheterPublicite(budget: number): void;
-    gererEmployes(): Utilisateur[];
-}
-
-class CompteStandard implements Compte {
-    constructor(public pseudo: string) {}
-    publier(texte: string) { /* ... */ }
-    envoyerMessagePrive(dest: Compte, texte: string) { /* ... */ }
-    acheterPublicite() { throw new Error("Réservé aux comptes premium"); }
-    gererEmployes() { throw new Error("Réservé aux entreprises"); }
-}
-
-class CompteEntreprise extends CompteStandard {
-    override envoyerMessagePrive() { throw new Error("Les entreprises ne peuvent pas envoyer de MP"); }
-    override acheterPublicite(budget: number) { /* ... */ }
-    override gererEmployes() { return []; }
 }
